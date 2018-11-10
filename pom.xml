@@ -33,6 +33,33 @@
 			<artifactId>commons-lang3</artifactId>
 			<version>${commons-lang3.version}</version>
 			</dependency>
+	
+		
+			
+		
+		<!-- hive jdbc -->
+			<dependency>
+		    <groupId>org.apache.hive</groupId>
+		    <artifactId>hive-jdbc</artifactId>
+		    <version>1.1.0</version>
+		</dependency>
+		
+		<!-- jsonlib 相关包 -->
+		   <dependency>
+            <groupId>net.sf.json-lib</groupId>
+            <artifactId>json-lib</artifactId>
+            <version>2.4</version>
+            <classifier>jdk15</classifier>
+        </dependency>
+       
+	    <dependency>  
+	      <groupId>fastutil</groupId>
+	      <artifactId>fastutil</artifactId>
+	      <version>5.0.9</version>
+	    </dependency>
+		
+	
+			
 		<!--json -->
 		<dependency>
 			<groupId>com.alibaba</groupId>
