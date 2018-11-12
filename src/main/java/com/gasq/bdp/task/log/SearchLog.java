@@ -57,7 +57,7 @@ public class SearchLog implements GasqSparkTask, Serializable {
 		//重建表还是insert表
 		boolean isCreate = true;
 		//输入两个参数,create  或者  insert 默认create
-		if(args.length >0){
+		if(args.length >1){
 			String param = args[1];
 			if(param!= null && !"".equals(param)){
 				if("insert".equals(param.toLowerCase())){
