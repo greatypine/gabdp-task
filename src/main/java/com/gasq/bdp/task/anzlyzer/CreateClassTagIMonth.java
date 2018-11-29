@@ -42,7 +42,7 @@ import scala.Tuple2;
 public class CreateClassTagIMonth implements GasqSparkTask{
 	static Logger logger = LoggerFactory.getLogger(CreateClassTagIMonth.class);
 	static final int partitionNum = 5;
-	static String fileoutpath = DFS_MASTER_PATH + "/user/juwg/test";
+	static String fileoutpath = "/user/juwg/test";
 
 	static final String pattern = "[(.0-9)]+ml|\\【.*?\\】|/|[.0-9]+cm|[.0-9]+g|[.0-9]+G|[.0-9]+kg|[.0-9]+KG|[.0-9]+L|[.0-9]+箱|[.0-9]+平米|[.0-9]+天|[.0-9]+月|[.0-9]+日|嘻嘻哈哈\r\n" + 
     		"          |[.0-9]+袋|[.0-9]+卷|[.0-9]+组|[.0-9]+斤|[.0-9]+片|[.0-9]+套|[.0-9]+瓶|[.0-9]+份|[.0-9]+包|[.0-9]+套|[.0-9]+毫升|[.0-9]+ML|[.0-9]+支|[.0-9]+寸|嘻嘻哈哈\r\n" + 

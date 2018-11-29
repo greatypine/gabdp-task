@@ -25,8 +25,7 @@ public interface GasqSparkTask extends GasqTask {
 		if(StringUtils.isBlank(appName)) appName = CommonUtils.createUUID();
 		if(isLocal==null) isLocal = true;
 		SparkConf conf = new SparkConf().setAppName(appName);
-		if(isLocal)conf.setMaster("local[*]");	// 上线需屏蔽
-		//resource里定义了hive-site.xml,以下的配置就不需要了
+		if(isLocal)conf.setMaster("local[*]");	// 上线需屏蔽了
 		//spark sql操作hive
 		conf.set("spark.sql.warehouse.dir", HIVE_WAREHOUSE);
 		SparkSession spark = SparkSession.builder().config(conf).enableHiveSupport().getOrCreate();

@@ -147,11 +147,10 @@ public class GuoanshequEdianLogParser implements LogParser {
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant start = Instant.now();
-//		String hiveWarehousePath = DFS_MASTER_PATH + HIVE_WAREHOUSE;  //hive仓库路径
 		
 		//格式化日志时间  yyyyMMdd.log
-		String inputPath = DFS_MASTER_PATH + args[0]+"/"+ DateUtil.getDiyStrDateTime(Integer.parseInt(args[2]),DateUtil.DATE_NO_FLAG_DATE_FORMAT) +".log";	//输入参数
-		String outputPath = DFS_MASTER_PATH + args[1];
+		String inputPath = args[0]+"/"+ DateUtil.getDiyStrDateTime(Integer.parseInt(args[2]),DateUtil.DATE_NO_FLAG_DATE_FORMAT) +".log";	//输入参数
+		String outputPath = args[1];
 		//for test
 //		inputPath = "hdfs://master:8020/user/es_input/20180909.log";
 //		outputPath = "hdfs://master:8020/user/renmian/test";
