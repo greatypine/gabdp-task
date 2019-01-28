@@ -43,13 +43,13 @@ public class SearchLog_2 {
 		System.setProperty("user.name", "hdfs");
 		
 		//重建表还是insert表
-		boolean isCreate = true;
-		//输入两个参数,create  或者  insert 默认create
+		boolean isCreate = false;
+		//输入两个参数,create  或者  insert 默认insert
 		if(args.length >0){
 			String param = args[0];
 			if(param!= null && !"".equals(param)){
-				if("insert".equals(param.toLowerCase())){
-					isCreate = false;
+				if("create".equals(param.toLowerCase())){
+					isCreate = true;
 				}
 			}
 		}
