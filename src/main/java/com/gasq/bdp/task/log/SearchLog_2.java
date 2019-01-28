@@ -33,7 +33,7 @@ import scala.Tuple2;
 
 public class SearchLog_2 {
 
-	private static final String tableName = "log_search";
+	private static final String tableName = "t_search_log";
 	//分区数量
 	private static final int partitionNum = 3; 
 	private static final String indexPath = "guoanshequ-*";
@@ -246,12 +246,12 @@ public class SearchLog_2 {
 		 
 		 if(isCreate){
 			 //有就删除
-			 spark.sql("drop table if exists gemini."+tableName+" purge ").count();
+			 spark.sql("drop table if exists default."+tableName+" purge ").count();
 			 //写入hive
-			 spark.sql("create table gemini."+tableName+" stored as parquet as select * from log_tmp_search").count();
+			 spark.sql("create table default."+tableName+" stored as parquet as select id, customer_id, product_id, product_name, key, create_time, store_id, front_store_id, cloud_store_id, mobilephone  , simple_date from log_tmp_search").count();
 		 }else{
 			 //写入hive
-			 spark.sql("insert into  gemini."+tableName+"  select * from log_tmp_search").count();
+			 spark.sql("insert into  default."+tableName+"  select id, customer_id, product_id, product_name, key, create_time, store_id, front_store_id, cloud_store_id, mobilephone  , simple_date from log_tmp_search").count();
 		 }
 		
 		 
