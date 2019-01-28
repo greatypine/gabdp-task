@@ -251,7 +251,9 @@ public class SearchLog_2 {
 			 spark.sql("create table default."+tableName+" stored as parquet as select id, customer_id, product_id, product_name, key, create_time, store_id, front_store_id, cloud_store_id, mobilephone  , simple_date from log_tmp_search").count();
 		 }else{
 			 //写入hive
-			 spark.sql("insert into  default."+tableName+"  select id, customer_id, product_id, product_name, key, create_time, store_id, front_store_id, cloud_store_id, mobilephone  , simple_date from log_tmp_search").count();
+				 spark.sql("insert overwrite table   default."+tableName+
+					 "  partition(simple_date)   select id, customer_id, product_id, product_name, key, create_time, store_id, front_store_id, cloud_store_id, mobilephone  , simple_date from log_tmp_search  "
+					 + " distribute by simple_date").count();
 		 }
 		
 		 
