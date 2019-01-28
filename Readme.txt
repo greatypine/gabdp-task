@@ -27,4 +27,7 @@ By Renmian @ 2018.07.23
 	a. 编译打包：进入${project_dir}执行命令：mvn clean package -DskipTests , 编译成功后会生成${project_dir}/target/gabdp-task.jar
 	b. 部署目录：上传gabdp-task.jar到slave2主机的/usr/local/tomcat-8081/gabdp-task/ 目录下
 	c. 运行任务可以参看t_sys_timer_job_exe_shell shell命令执行的调用
-		
+
+Add feature By Liyangyang @2019.01.28
+1. 解析搜索日志数据index: guoanshequ-* / tags: "gsearch_analysis"
+2. 并清洗入库存放到数据表default.t_search_log分区表中	
