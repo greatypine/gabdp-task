@@ -35,7 +35,7 @@ public class SearchLog_2 {
 
 	private static final String tableName = "default.t_search_log";
 	//分区数量
-	private static final int partitionNum = 3; 
+	private static final int partitionNum = 1; 
 	private static final String indexPath = "guoanshequ-";
 	static Logger logger = LoggerFactory.getLogger(SearchLog_2.class);
 	public static void main(String[] args) throws Exception {
