@@ -36,7 +36,7 @@ public class SearchLog_2 {
 	private static final String tableName = "default.t_search_log";
 	//分区数量
 	private static final int partitionNum = 3; 
-	private static final String indexPath = "guoanshequ-*";
+	private static final String indexPath = "guoanshequ-";
 	static Logger logger = LoggerFactory.getLogger(SearchLog_2.class);
 	public static void main(String[] args) throws Exception {
 		
@@ -62,6 +62,7 @@ public class SearchLog_2 {
         conf.set("spark.io.compression.codec", "org.apache.spark.io.LZFCompressionCodec");
         conf.set("es.index.auto.create", "true");
         conf.set("es.index.read.missing.as.empty", "yes");
+//        conf.setMaster("local[*]");	// 上线需屏蔽了
         
 		 //读取测试hive数据
 		 SparkSession spark = SparkSession
@@ -99,7 +100,7 @@ public class SearchLog_2 {
 				  +"      \"must\": ["
 				  +"        { \"match\": { \"tags\":  \"gsearch_analysis\" }},"
 				  +"        {\"match\": {"
-				  +"          \"source\": \"/tomcat/logs/gsearch_analysis."+yesterday+".log\""
+				  +"          \"source\": \"gsearch_analysis."+yesterday+"\""
 				  +"        }}"
 				  +"      ]"
 				  +"    }"
@@ -107,7 +108,7 @@ public class SearchLog_2 {
 				  +"}");
 		  
 		 JavaPairRDD<String, Map<String, Object>> esRDD2 =
-				 esRDD(jsc, indexPath ,query.toString());
+				 esRDD(jsc, indexPath + yesterday ,query.toString());	//index加上日期作为时间控制
 		 
 		 //分区
 		 JavaPairRDD<String, Map<String, Object>> repartitionRDD = esRDD2.repartition(partitionNum);
