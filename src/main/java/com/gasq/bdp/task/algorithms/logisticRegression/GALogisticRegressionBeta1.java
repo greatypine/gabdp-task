@@ -55,7 +55,7 @@ public class GALogisticRegressionBeta1 implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant start = Instant.now();
-		SparkSession spark = getHiveSpark("GALogisticRegression",true);
+		SparkSession spark = getHiveSpark("GALogisticRegression",false);
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
 		Configuration hadoopConfiguration = sc.hadoopConfiguration();
         hadoopConfiguration.setBoolean("fs.hdfs.impl.disable.cache", true);

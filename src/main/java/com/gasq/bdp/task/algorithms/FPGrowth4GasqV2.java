@@ -130,7 +130,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
         logger.info("输入参数为->"+StringUtils.join(args,","));
-        SparkSession spark = getHiveSpark("FPGrowth4GasqV2",true);
+        SparkSession spark = getHiveSpark("FPGrowth4GasqV2",false);	//true 为本地，false为集群。正式环境的设置为集群
         spark.conf().set("spark.sql.broadcastTimeout", "36000");
         spark.conf().set("spark.kryoserializer.buffer.max","256");
         spark.conf().set("spark.kryoserializer.buffer","128");

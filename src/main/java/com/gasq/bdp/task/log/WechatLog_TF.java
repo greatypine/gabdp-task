@@ -47,7 +47,7 @@ public class WechatLog_TF  implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant start = Instant.now();
-		SparkSession spark = getHiveSpark("WechatLog",true);
+		SparkSession spark = getHiveSpark("WechatLog",false);
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
 //		sc.setLogLevel("INFO");
 		Configuration hadoopConfiguration = sc.hadoopConfiguration();

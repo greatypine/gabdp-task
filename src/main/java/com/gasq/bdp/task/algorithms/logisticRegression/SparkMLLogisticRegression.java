@@ -54,7 +54,7 @@ public class SparkMLLogisticRegression implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant start = Instant.now();
-		SparkSession spark = getHiveSpark("LogisticRegression",true);
+		SparkSession spark = getHiveSpark("LogisticRegression",false);
 		SparkContext sc = new JavaSparkContext(spark.sparkContext()).sc();
 		//通过MLUtils工具类读取LIBSVM格式数据集
 		RDD<LabeledPoint> data = MLUtils.loadLibSVMFile(sc,"D:/usr/testSet.txt");
