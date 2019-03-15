@@ -55,7 +55,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
     	String[] keyandcount = key.split("\\|");
     	String store_id = keyandcount[0];
     	double count = Double.parseDouble(keyandcount[1].toString());
-		//创建FPGrowth的算法实例，同时设置好训练时的最小支持度和数据分区
+		//创建FPGrowth的算法实例，同时设置好训练时的最小支持度和数据分区，
 		FPGrowth fpGrowth = new FPGrowth().setMinSupport(minSupport).setNumPartitions(numPartition);
 		FPGrowthModel<String> model = fpGrowth.run(value);//执行算法
 		//查看所有频繁集，并列出它出现的次数
@@ -121,16 +121,16 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		Instant start = Instant.now();
     	final List<String> result = new ArrayList<String>();
     	final Map<String,Long> acdata = new HashMap<String,Long>();
-        double minSupport = 0.001;//最小支持度
+        double minSupport = 0.005;//最小支持度
         int numPartition = 4;  //数据分区
         double minConfidence = 0.5;//最小置信度
         if(args.length < 1){logger.info("<input data_path>");System.exit(-1);}
-        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp where temp.ct>1 and temp.ct <=15 union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 where temp1.ct>1 and temp1.ct <=15 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 where temp2.ct>1 and temp2.ct <=15 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3 where temp3.ct>1 and temp3.ct <=15";//数据集路径
+        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
         if(args.length >= 2)minSupport = Double.parseDouble(args[1]);
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
         logger.info("输入参数为->"+StringUtils.join(args,","));
-        SparkSession spark = getHiveSpark("FPGrowth4GasqV2",false);	//true 为本地，false为集群。正式环境的设置为集群
+        SparkSession spark = getHiveSpark("FPGrowth4GasqV2", false);	//true 为本地，false为集群。正式环境的设置为集群
         spark.conf().set("spark.sql.broadcastTimeout", "36000");
         spark.conf().set("spark.kryoserializer.buffer.max","256");
         spark.conf().set("spark.kryoserializer.buffer","128");
