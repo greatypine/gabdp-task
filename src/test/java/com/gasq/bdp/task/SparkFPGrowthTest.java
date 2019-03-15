@@ -23,7 +23,7 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		
-		double minSupport = 0.005;//最小支持度
+		double minSupport = 0.006;//最小支持度
         int numPartition = 4;  //数据分区
         double minConfidence = 0.5;//最小置信度
         

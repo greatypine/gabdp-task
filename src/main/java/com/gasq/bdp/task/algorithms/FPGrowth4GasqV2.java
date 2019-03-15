@@ -169,11 +169,17 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
         	String _1 = t._1;
 			Iterable<List<String>> _2 = t._2;
 			List<List<String>> list = IteratorUtils.toList(_2.iterator());
-			logger.info("将javaPairRdd转换为listmap对象：key:"+_1+"\t value:"+StringUtils.join(list, " ")+"\t count:"+list.size());
 			String key = _1+"|"+list.size();
 			JavaRDD<List<String>> value = sc.parallelize(list);	
 			List<String> value2 = broadcastResult.getValue();
-			value2.addAll(fpgrowth(sc,value,key,minSupport,numPartition,minConfidence,broadcastacdata));
+			//minSupport应该随着购买商品的用户总量变化
+			minSupport = getMinSupportBy(list.size(), minSupport);
+			logger.info("将javaPairRdd转换为listmap对象：key:"+_1+"\t minSupport:"+ minSupport +"\t count:"+list.size());
+			if(minSupport == 0.0) {
+				logger.warn("!!!key:"+_1+"\t计算基数太小不做关联分析计算！");
+			} else {
+				value2.addAll(fpgrowth(sc,value,key,minSupport,numPartition,minConfidence,broadcastacdata));
+			}
 		}
 		JavaRDD<String> distData = sc.parallelize(result);
 		distData.coalesce(1).saveAsTextFile(args[0]);
@@ -181,6 +187,20 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		logger.warn("FPGrowth算法运行完成-------输出结果数----《"+result.size()+"》----总用时："+ Duration.between(start, end).toMinutes() +"分钟！");
 		sc.close();
 		return 0;
+	}
+	
+	private double getMinSupportBy(int base, double defaultMinSupport) {
+		double minSupport = 0.0;	//
+		if(base < 10) {
+			minSupport = 0.0;
+		} else if (base >= 10 && base < 100) {
+			minSupport = 2.0;
+		} else if (base >= 100 && base < 1000) {
+			minSupport = 4.0;
+		} else if (base >= 1000) {
+			return defaultMinSupport;
+		}
+		return (double)(minSupport/base);
 	}
     
 }
