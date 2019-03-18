@@ -71,7 +71,8 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		//consequent表示后项
 		//confidence表示规则的置信度
 		List<String> fpGrowthResult = new ArrayList<String>();
-		List<Rule<String>> collect = model.generateAssociationRules(minConfidence).toJavaRDD().filter(v1 -> v1.javaAntecedent().size() == 1 && v1.javaConsequent().size() == 1).collect();
+		List<Rule<String>> collect = model.generateAssociationRules(minConfidence).toJavaRDD()
+				.filter(v1 -> v1.javaAntecedent().size() == 1).collect();
 		for (Rule<String> v1 : collect) {
 			List<String> javaAntecedent = v1.javaAntecedent();
 			List<String> javaConsequent = v1.javaConsequent();
@@ -121,12 +122,12 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		Instant start = Instant.now();
     	final List<String> result = new ArrayList<String>();
     	final Map<String,Long> acdata = new HashMap<String,Long>();
-        double minSupport = 0.005;//最小支持度
+        double defaultMinSupport = 0.005;//最小支持度
         int numPartition = 4;  //数据分区
         double minConfidence = 0.5;//最小置信度
         if(args.length < 1){logger.info("<input data_path>");System.exit(-1);}
         String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
-        if(args.length >= 2)minSupport = Double.parseDouble(args[1]);
+        if(args.length >= 2)defaultMinSupport = Double.parseDouble(args[1]);
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
         logger.info("输入参数为->"+StringUtils.join(args,","));
@@ -173,7 +174,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 			JavaRDD<List<String>> value = sc.parallelize(list);	
 			List<String> value2 = broadcastResult.getValue();
 			//minSupport应该随着购买商品的用户总量变化
-			minSupport = getMinSupportBy(list.size(), minSupport);
+			double minSupport = getMinSupportBy(list.size(), defaultMinSupport);
 			logger.info("将javaPairRdd转换为listmap对象：key:"+_1+"\t minSupport:"+ minSupport +"\t count:"+list.size());
 			if(minSupport == 0.0) {
 				logger.warn("!!!key:"+_1+"\t计算基数太小不做关联分析计算！");
@@ -190,17 +191,16 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 	}
 	
 	private double getMinSupportBy(int base, double defaultMinSupport) {
-		double minSupport = 0.0;	//
 		if(base < 10) {
-			minSupport = 0.0;
-		} else if (base >= 10 && base < 100) {
-			minSupport = 2.0;
-		} else if (base >= 100 && base < 1000) {
-			minSupport = 4.0;
+			return 0.0;
+		} else if (base >= 10 && base < 200) {
+			return 0.1;
+		} else if (base >= 200 && base < 1000) {
+			return 0.01;
 		} else if (base >= 1000) {
 			return defaultMinSupport;
 		}
-		return (double)(minSupport/base);
+		return defaultMinSupport;
 	}
     
 }

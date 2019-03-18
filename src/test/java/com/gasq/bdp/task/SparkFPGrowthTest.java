@@ -23,13 +23,21 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		
-		double minSupport = 0.006;//最小支持度
+//		double minSupport = 0.005;//最小支持度
+//		double minSupport = (double)(2.0/35);
+		double minSupport = 0.01;
+		System.out.println("-----------------------------------------" + minSupport);
         int numPartition = 4;  //数据分区
         double minConfidence = 0.5;//最小置信度
         
 		SparkSession spark = getHiveSpark("SparkFPGrowthTest",true);	//true 为本地，false为集群。正式环境的设置为集群
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
-		JavaRDD<String> data = sc.textFile("E://tmp//hello//store29.txt");
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store29.txt");   //minSupport=0.005  list.size=1393
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store_hlg.txt");  //minSupport=0.1  list.size=35
+		JavaRDD<String> data = sc.textFile("E://tmp//hello//store58.txt");  //minSupport=0.01  list.size=489
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store_jb.txt");  //minSupport=0.01  list.size=595
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store310101.txt");  //minSupport=0.01  list.size=140
+		
 		JavaRDD<List<String>> items = data.map(new Function<String, List<String>>() {
 
 			@Override
@@ -54,6 +62,19 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 			}
 		});
 		return 0;
+	}
+	
+	private double getMinSupportBy(int base, double defaultMinSupport) {
+		if(base < 10) {
+			return 0.0;
+		} else if (base >= 10 && base < 100) {
+			return (double)(2.0 / base);
+		} else if (base >= 100 && base < 1000) {
+			return (double)(4.0 / base);
+		} else if (base >= 1000) {
+			return defaultMinSupport;
+		}
+		return defaultMinSupport;
 	}
 
 }
