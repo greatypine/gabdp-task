@@ -59,7 +59,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		FPGrowth fpGrowth = new FPGrowth().setMinSupport(minSupport).setNumPartitions(numPartition);
 		FPGrowthModel<String> model = fpGrowth.run(value);//执行算法
 		//查看所有频繁集，并列出它出现的次数
-		List<FreqItemset<String>> collect2 = model.freqItemsets().toJavaRDD().filter(fi -> fi.javaItems().size()<=2).collect();
+		List<FreqItemset<String>> collect2 = model.freqItemsets().toJavaRDD().filter(fi -> fi.javaItems().size() <= 2).collect();
 		collect2.forEach(itemset -> {
 			logger.info("门店《"+key+"》的频繁集----》"+"[" + itemset.javaItems() + "]," + itemset.freq());
     		Map<String, Long> acdata1 = broadcast.value();
@@ -127,6 +127,8 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
         double minConfidence = 0.5;//最小置信度
         if(args.length < 1){logger.info("<input data_path>");System.exit(-1);}
         String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
+        //test
+//        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct  from gabdp_user.m_apriori_data a where store_id='00000000000000000000000000000029' group by a.mykey,a.store_id)temp";//数据集路径
         if(args.length >= 2)defaultMinSupport = Double.parseDouble(args[1]);
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
@@ -191,11 +193,13 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 	}
 	
 	private double getMinSupportBy(int base, double defaultMinSupport) {
-		if(base < 10) {
+		if(base < 50) {
 			return 0.0;
-		} else if (base >= 10 && base < 200) {
+		} else if (base >= 50 && base < 200) {
 			return 0.1;
-		} else if (base >= 200 && base < 1000) {
+		} else if (base >= 200 && base < 400) {
+			return 0.05;
+		} else if (base >= 400 && base < 1000) {
 			return 0.01;
 		} else if (base >= 1000) {
 			return defaultMinSupport;
