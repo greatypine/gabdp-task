@@ -34,10 +34,10 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
 //		JavaRDD<String> data = sc.textFile("E://tmp//hello//store29.txt");   //minSupport=0.005  list.size=1393
 //		JavaRDD<String> data = sc.textFile("E://tmp//hello//store_hlg.txt");  //minSupport=0.1  list.size=35
-		JavaRDD<String> data = sc.textFile("E://tmp//hello//store58.txt");  //minSupport=0.01  list.size=489
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store58.txt");  //minSupport=0.01  list.size=489
 //		JavaRDD<String> data = sc.textFile("E://tmp//hello//store_jb.txt");  //minSupport=0.01  list.size=595
-//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store310101.txt");  //minSupport=0.01  list.size=140
-		
+//		JavaRDD<String> data = sc.textFile("E://tmp//hello//store310101.txt");  //minSupport=0.1  list.size=140
+		JavaRDD<String> data = sc.textFile("E://tmp//hello//store310112.txt");  //minSupport=0.01  list.size=305
 		JavaRDD<List<String>> items = data.map(new Function<String, List<String>>() {
 
 			@Override
@@ -57,7 +57,7 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 		});
 		
 		model.generateAssociationRules(minConfidence).toJavaRDD().collect().forEach( rule -> {
-			if(rule.javaAntecedent().size() == 1) {
+			if(rule.javaAntecedent().size() == 1 && rule.javaConsequent().size() == 1) {
 				System.out.println(rule.javaAntecedent() + "-->" + rule.javaConsequent() + ":" + rule.confidence());
 			}
 		});

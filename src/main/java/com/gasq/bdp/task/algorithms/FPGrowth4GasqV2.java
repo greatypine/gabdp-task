@@ -72,7 +72,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		//confidence表示规则的置信度
 		List<String> fpGrowthResult = new ArrayList<String>();
 		List<Rule<String>> collect = model.generateAssociationRules(minConfidence).toJavaRDD()
-				.filter(v1 -> v1.javaAntecedent().size() == 1).collect();
+				.filter(v1 -> v1.javaAntecedent().size() == 1 && v1.javaConsequent().size() == 1).collect();
 		for (Rule<String> v1 : collect) {
 			List<String> javaAntecedent = v1.javaAntecedent();
 			List<String> javaConsequent = v1.javaConsequent();
