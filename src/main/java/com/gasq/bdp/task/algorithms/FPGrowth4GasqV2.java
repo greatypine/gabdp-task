@@ -19,9 +19,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.mllib.fpm.AssociationRules.Rule;
 import org.apache.spark.mllib.fpm.FPGrowth;
 import org.apache.spark.mllib.fpm.FPGrowth.FreqItemset;
 import org.apache.spark.mllib.fpm.FPGrowthModel;
@@ -70,46 +68,47 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		//antecedent表示前项
 		//consequent表示后项
 		//confidence表示规则的置信度
-		List<String> fpGrowthResult = new ArrayList<String>();
-		List<Rule<String>> collect = model.generateAssociationRules(minConfidence).toJavaRDD()
-				.filter(v1 -> v1.javaAntecedent().size() == 1 && v1.javaConsequent().size() == 1).collect();
-		for (Rule<String> v1 : collect) {
-			List<String> javaAntecedent = v1.javaAntecedent();
-			List<String> javaConsequent = v1.javaConsequent();
-			double confidence = v1.confidence();
-			Map<String, Long> acdata1 = broadcast.value();
-			List<String> javaac = new ArrayList<String>();
-			javaac.addAll(javaAntecedent);
-			javaac.addAll(javaConsequent);
-			Long freq = acdata1.get(StringUtils.join(javaac,","));
-			if(freq==null) {
-				Collections.reverse(javaac);
-				freq = acdata1.get(StringUtils.join(javaac,","));
-			}
-			if(freq!=null) {
-				if(freq>0) {
-					double sup = freq/count;
-					Long pCFreq = acdata1.get(StringUtils.join(javaConsequent,","));
-					double lift = confidence/(pCFreq/count);
-					//area format:store_id, store_name, province_code, city_code, ad_code
-					String areaStr = "";
-					if(store_id.length() == 6) {
-						if(store_id.substring(2).equals("0000")) {//province_code
-							areaStr = String.join("\t", "null", "null", store_id, "null", "null");
-						} else if (store_id.substring(4).equals("00")) {//city_code
-							areaStr = String.join("\t", "null", "null", store_id.substring(0,2)+"0000",store_id,"null");
-						} else {
-							areaStr = String.join("\t", "null", "null",store_id.substring(0,2)+"0000",store_id.substring(0,4)+"00", store_id);
-						}
-					} else {
-						areaStr = String.join("\t", store_id, "null", "null", "null", "null");
+		List<String> fpGrowthResult = model.generateAssociationRules(minConfidence).toJavaRDD()
+				.filter(v1 -> v1.javaAntecedent().size() == 1 && v1.javaConsequent().size() == 1)
+				.map(v1 -> {
+					String ss = null;
+					List<String> javaAntecedent = v1.javaAntecedent();
+					List<String> javaConsequent = v1.javaConsequent();
+					double confidence = v1.confidence();
+					Map<String, Long> acdata1 = broadcast.value();
+					List<String> javaac = new ArrayList<String>();
+					javaac.addAll(javaAntecedent);
+					javaac.addAll(javaConsequent);
+					Long freq = acdata1.get(StringUtils.join(javaac,","));
+					if(freq==null) {
+						Collections.reverse(javaac);
+						freq = acdata1.get(StringUtils.join(javaac,","));
 					}
-					String ss = String.join("\t",areaStr,StringUtils.join(javaAntecedent,","),StringUtils.join(javaConsequent,","),confidence+"",sup+"",lift+"");
-					fpGrowthResult.add(ss);
-					logger.info("计算结果----》"+ss);
-				}
-			}
-		}
+					if(freq!=null) {
+						if(freq>0) {
+							double sup = freq/count;
+							Long pCFreq = acdata1.get(StringUtils.join(javaConsequent,","));
+							double lift = confidence/(pCFreq/count);
+							//area format:store_id, store_name, province_code, city_code, ad_code
+							String areaStr = "";
+							if(store_id.length() == 6) {
+								if(store_id.substring(2).equals("0000")) {//province_code
+									areaStr = String.join("\t", "null", "null", store_id, "null", "null");
+								} else if (store_id.substring(4).equals("00")) {//city_code
+									areaStr = String.join("\t", "null", "null", store_id.substring(0,2)+"0000",store_id,"null");
+								} else {
+									areaStr = String.join("\t", "null", "null",store_id.substring(0,2)+"0000",store_id.substring(0,4)+"00", store_id);
+								}
+							} else {
+								areaStr = String.join("\t", store_id, "null", "null", "null", "null");
+							}
+							ss = String.join("\t",areaStr,StringUtils.join(javaAntecedent,","),StringUtils.join(javaConsequent,","),confidence+"",sup+"",lift+"");
+							logger.info("计算结果----》"+ss);
+						}
+					}
+					return ss;
+				}).filter(ss -> ss != null).collect();
+
 		logger.warn("门店《"+store_id+"》的频繁集----》"+"[" + fpGrowthResult.size() + "]");
 		Map<String, Long> acdata1 = broadcast.value();
 		acdata1.clear();
@@ -123,13 +122,15 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
     	final List<String> result = new ArrayList<String>();
     	final Map<String,Long> acdata = new HashMap<String,Long>();
         double defaultMinSupport = 0.005;//最小支持度
-        int numPartition = 4;  //数据分区
+        int numPartition = 10;  //数据分区
         double minConfidence = 0.5;//最小置信度
         if(args.length < 1){logger.info("<input data_path>");System.exit(-1);}
-        //String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
-        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp where temp.ct>1 and temp.ct <=15 union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 where temp1.ct>1 and temp1.ct <=15 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 where temp2.ct>1 and temp2.ct <=15 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3 where temp3.ct>1 and temp3.ct <=15";//数据集路径
+        
+//        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
+//        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp where temp.ct>1 and temp.ct <=15 union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 where temp1.ct>1 and temp1.ct <=15 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 where temp2.ct>1 and temp2.ct <=15 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3 where temp3.ct>1 and temp3.ct <=15";//数据集路径
         //test
 //        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct  from gabdp_user.m_apriori_data a where store_id='00000000000000000000000000000029' group by a.mykey,a.store_id)temp";//数据集路径
+        
         if(args.length >= 2)defaultMinSupport = Double.parseDouble(args[1]);
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
@@ -149,32 +150,34 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
         hadoopConfiguration.setBoolean("fs.hdfs.impl.disable.cache", true);
 		HdfsFileUtil.removeHfile(hadoopConfiguration,args[0]);
 		//加载数据，并将数据通过空格分割
+		
+		String sql = "select key, vst from ("
+					+ "select a.province_code as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code" 
+					+ " union all "
+					+ "select a.city_code as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code"
+					+ " union all "
+					+ "select a.ad_code as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code"
+					+ " union all "
+					+ "select a.store_id as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id"
+					+ ") tmp";
 		Dataset<Row> ds = spark.sql(sql);
+
+//		Dataset<Row> ds = spark.read().csv("E://tmp//hello//query-hive-35949.csv");
 		
-		JavaPairRDD<String, List<String>> transactions = ds.javaRDD().mapToPair(new PairFunction<Row, String, List<String>>() {
-			private static final long serialVersionUID = 1L;
-			@Override
-			public Tuple2<String, List<String>> call(Row row) throws Exception {
-				logger.info("传入的ROW对象为："+row.mkString());
-				String[] vs = row.getString(0).toString().trim().split("\t");
-  				String key = vs[0].toString().trim().replaceAll(" ", "");
-  				String[] v = vs[1].toString().trim().replaceAll(" ", "").split(",");
-  				String vv = StringUtils.join(v," ");
-  				logger.info("转换为JavaPairRDD<k,v>对象：key:"+key+"\t value:"+vv);
-  				//NOTE！！！List<String>应该没有重复数据，否则会抛org.apache.spark.SparkException: Items in a transaction must be unique but got WrappedArray
-  				//目前做法是构造数据时就进行去重，也可以放到程序中去处理
-  				List<String> arrList =  Arrays.asList(v);
-  				return new Tuple2<String, List<String>>(key, arrList);
-			}
-		 });
+		JavaPairRDD<String, List<String>> rs = ds.sortWithinPartitions("key").javaRDD().mapToPair(row -> {
+			String key = row.getString(0);
+			String items = row.getString(1);
+			List<String> arrList =  Arrays.asList(items.split(","));
+			return new Tuple2<String, List<String>>(key, arrList);
+		});
 		
-        List<Tuple2<String, Iterable<List<String>>>> collect = transactions.groupByKey().collect();
-        for (Tuple2<String, Iterable<List<String>>> t : collect) {
+		List<Tuple2<String, Iterable<List<String>>>> rsList = rs.groupByKey(numPartition).collect();
+		for(Tuple2<String, Iterable<List<String>>> t : rsList) {
         	String _1 = t._1;
 			Iterable<List<String>> _2 = t._2;
 			List<List<String>> list = IteratorUtils.toList(_2.iterator());
 			String key = _1+"|"+list.size();
-			JavaRDD<List<String>> value = sc.parallelize(list);	
+			JavaRDD<List<String>> value = sc.parallelize(list);
 			List<String> value2 = broadcastResult.getValue();
 			//minSupport应该随着购买商品的用户总量变化
 			double minSupport = getMinSupportBy(list.size(), defaultMinSupport);
@@ -197,15 +200,15 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		if(base < 50) {
 			return 0.0;
 		} else if (base >= 50 && base < 200) {
-			return 0.1;
+			return 4 / (double)base;
 		} else if (base >= 200 && base < 400) {
 			return 0.05;
 		} else if (base >= 400 && base < 1000) {
 			return 0.01;
-		} else if (base >= 1000) {
+		} else if (base >= 1000 && base < 10000) {
 			return defaultMinSupport;
-		}
-		return defaultMinSupport;
+		} else
+			return 0.001;
 	}
     
 }
