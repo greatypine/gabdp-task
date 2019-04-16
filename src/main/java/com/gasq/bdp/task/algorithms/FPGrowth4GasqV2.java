@@ -44,12 +44,16 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 	private static final long serialVersionUID = 1L;
 	transient static Logger logger = LoggerFactory.getLogger(FPGrowth4GasqV2.class);
 	static Long count = null;
+	
+	private static double defaultMinSupport = 0.005;//最小支持度
+	private static int numPartition = 10;  //数据分区
+	private static double minConfidence = 0.5;//最小置信度
 	public static void main(String[] args) throws Exception{
     	FPGrowth4GasqV2 task = new FPGrowth4GasqV2();
     	task.run(args);
     }
     
-    private static List<String> fpgrowth(JavaSparkContext sc,JavaRDD<List<String>> value,String key,double minSupport,int numPartition,double minConfidence, Broadcast<Map<String, Long>> broadcast){
+    private static List<String> fpgrowth(JavaRDD<List<String>> value,String key, double minSupport, Broadcast<Map<String, Long>> broadcast){
     	String[] keyandcount = key.split("\\|");
     	String store_id = keyandcount[0];
     	double count = Double.parseDouble(keyandcount[1].toString());
@@ -59,7 +63,7 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		//查看所有频繁集，并列出它出现的次数
 		List<FreqItemset<String>> collect2 = model.freqItemsets().toJavaRDD().filter(fi -> fi.javaItems().size() <= 2).collect();
 		collect2.forEach(itemset -> {
-			logger.info("门店《"+key+"》的频繁集----》"+"[" + itemset.javaItems() + "]," + itemset.freq());
+//			logger.info("门店《"+key+"》的频繁集----》"+"[" + itemset.javaItems() + "]," + itemset.freq());
     		Map<String, Long> acdata1 = broadcast.value();
     		acdata1.put(StringUtils.join(itemset.javaItems(),","), itemset.freq());
 		});
@@ -89,20 +93,8 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 							double sup = freq/count;
 							Long pCFreq = acdata1.get(StringUtils.join(javaConsequent,","));
 							double lift = confidence/(pCFreq/count);
-							//area format:store_id, store_name, province_code, city_code, ad_code
-							String areaStr = "";
-							if(store_id.length() == 6) {
-								if(store_id.substring(2).equals("0000")) {//province_code
-									areaStr = String.join("\t", "null", "null", store_id, "null", "null");
-								} else if (store_id.substring(4).equals("00")) {//city_code
-									areaStr = String.join("\t", "null", "null", store_id.substring(0,2)+"0000",store_id,"null");
-								} else {
-									areaStr = String.join("\t", "null", "null",store_id.substring(0,2)+"0000",store_id.substring(0,4)+"00", store_id);
-								}
-							} else {
-								areaStr = String.join("\t", store_id, "null", "null", "null", "null");
-							}
-							ss = String.join("\t",areaStr,StringUtils.join(javaAntecedent,","),StringUtils.join(javaConsequent,","),confidence+"",sup+"",lift+"");
+							String areaStr = getAreaStr(store_id);
+							ss = String.join("\t", areaStr, StringUtils.join(javaAntecedent,","),StringUtils.join(javaConsequent,","),confidence+"",sup+"",lift+"");
 							logger.info("计算结果----》"+ss);
 						}
 					}
@@ -114,16 +106,30 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		acdata1.clear();
 		return fpGrowthResult;
     }
+    
+  	//area format:store_id, store_name, province_code, city_code, ad_code
+    private static String getAreaStr(String store_id) {
+		String areaStr = "";
+		if(store_id.length() == 6) {
+			if(store_id.substring(2).equals("0000")) {//province_code
+				areaStr = String.join("\t", "null", "null", store_id, "null", "null");
+			} else if (store_id.substring(4).equals("00")) {//city_code
+				areaStr = String.join("\t", "null", "null", store_id.substring(0,2)+"0000",store_id,"null");
+			} else {
+				areaStr = String.join("\t", "null", "null",store_id.substring(0,2)+"0000",store_id.substring(0,4)+"00", store_id);
+			}
+		} else {
+			areaStr = String.join("\t", store_id, "null", "null", "null", "null");
+		} 
+		return areaStr;
+    }
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant start = Instant.now();
-    	final List<String> result = new ArrayList<String>();
     	final Map<String,Long> acdata = new HashMap<String,Long>();
-        double defaultMinSupport = 0.005;//最小支持度
-        int numPartition = 10;  //数据分区
-        double minConfidence = 0.5;//最小置信度
+       
         if(args.length < 1){logger.info("<input data_path>");System.exit(-1);}
         
 //        String sql = "select temp.vst from(select concat(a.store_id,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.store_id )temp union all select temp1.vst from(select concat(a.province_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code )temp1 union all select temp2.vst from(select concat(a.city_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code )temp2 union all select temp3.vst from(select concat(a.ad_code,'\\t',concat_ws(',',collect_list(distinct a.item_id))) vst,count(1)as ct from gabdp_user.m_apriori_data a group by a.mykey,a.ad_code )temp3";//数据集路径
@@ -135,8 +141,9 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
         if(args.length >= 3)numPartition = Integer.parseInt(args[2]);
         if(args.length >= 4)minConfidence = Double.parseDouble(args[3]);
         logger.info("输入参数为->"+StringUtils.join(args,","));
-        SparkSession spark = getHiveSpark("FPGrowth4GasqV2", false);	//true 为本地，false为集群。正式环境的设置为集群
+        SparkSession spark = getHiveSpark("FPGrowth4GasqV2", true);	//true 为本地，false为集群。正式环境的设置为集群
         spark.conf().set("spark.sql.broadcastTimeout", "36000");
+        spark.conf().set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
         spark.conf().set("spark.kryoserializer.buffer.max","256");
         spark.conf().set("spark.kryoserializer.buffer","128");
 		spark.conf().set("spark.sql.codegen", "false");
@@ -144,14 +151,14 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		spark.conf().set("spark.sql.inMemoryColumnarStorage.batchSize", "1000");
 		spark.conf().set("spark.sql.parquet.compression.codec", "snappy");
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
-		final Broadcast<List<String>> broadcastResult = sc.broadcast(result);
+		sc.getConf().registerKryoClasses(new Class[]{org.apache.spark.api.java.JavaSparkContext.class});
         final Broadcast<Map<String, Long>> broadcastacdata = sc.broadcast(acdata);
         Configuration hadoopConfiguration = sc.hadoopConfiguration();
         hadoopConfiguration.setBoolean("fs.hdfs.impl.disable.cache", true);
 		HdfsFileUtil.removeHfile(hadoopConfiguration,args[0]);
 		//加载数据，并将数据通过空格分割
 		
-		String sql = "select key, vst from ("
+		String sql = "select key as _c0, vst as _c1 from ("
 					+ "select a.province_code as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.province_code" 
 					+ " union all "
 					+ "select a.city_code as key, concat_ws(',',collect_list(distinct a.item_id)) vst,count(distinct a.item_id) as ct from gabdp_user.m_apriori_data a group by a.mykey,a.city_code"
@@ -163,33 +170,36 @@ public class FPGrowth4GasqV2 implements GasqSparkTask, Serializable {
 		Dataset<Row> ds = spark.sql(sql);
 
 //		Dataset<Row> ds = spark.read().csv("E://tmp//hello//query-hive-35949.csv");
-		
-		JavaPairRDD<String, List<String>> rs = ds.sortWithinPartitions("key").javaRDD().mapToPair(row -> {
+		//构建数据
+		JavaPairRDD<String, List<String>> rs = ds.sortWithinPartitions("_c0").javaRDD().mapToPair(row -> {
 			String key = row.getString(0);
 			String items = row.getString(1);
-			List<String> arrList =  Arrays.asList(items.split(","));
+			List<String> arrList =  new ArrayList<>();
+			arrList.addAll(Arrays.asList(items.split(",")));
 			return new Tuple2<String, List<String>>(key, arrList);
 		});
+
 		
+		List<String> result = new ArrayList<String>();
 		List<Tuple2<String, Iterable<List<String>>>> rsList = rs.groupByKey(numPartition).collect();
-		for(Tuple2<String, Iterable<List<String>>> t : rsList) {
+		for(Tuple2<String, Iterable<List<String>>> t : rsList) {	//每个店/区/市/省挨个分开计算
         	String _1 = t._1;
 			Iterable<List<String>> _2 = t._2;
 			List<List<String>> list = IteratorUtils.toList(_2.iterator());
 			String key = _1+"|"+list.size();
 			JavaRDD<List<String>> value = sc.parallelize(list);
-			List<String> value2 = broadcastResult.getValue();
 			//minSupport应该随着购买商品的用户总量变化
 			double minSupport = getMinSupportBy(list.size(), defaultMinSupport);
 			logger.info("将javaPairRdd转换为listmap对象：key:"+_1+"\t minSupport:"+ minSupport +"\t count:"+list.size());
 			if(minSupport == 0.0) {
 				logger.warn("!!!key:"+_1+"\t计算基数太小不做关联分析计算！");
 			} else {
-				value2.addAll(fpgrowth(sc,value,key,minSupport,numPartition,minConfidence,broadcastacdata));
+				result.addAll(fpgrowth(value,key,minSupport,broadcastacdata));
 			}
 		}
 		JavaRDD<String> distData = sc.parallelize(result);
 		distData.coalesce(1).saveAsTextFile(args[0]);
+//		distData.coalesce(1).saveAsTextFile("E://tmp//hello//result");
 		Instant end = Instant.now();
 		logger.warn("FPGrowth算法运行完成-------输出结果数----《"+result.size()+"》----总用时："+ Duration.between(start, end).toMinutes() +"分钟！");
 		sc.close();
