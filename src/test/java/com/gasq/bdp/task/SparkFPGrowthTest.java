@@ -20,10 +20,17 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
+import com.gasq.bdp.task.algorithms.FPGrowth4GasqV2;
+
 import scala.Tuple2;
 
 
 public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
+	
+	double minSupport = 0.005;
+	
+    int numPartition = 10;  //数据分区
+    double minConfidence = 0.5;//最小置信度
 	
 	public static void main(String[] args) throws Exception{
 		SparkFPGrowthTest task = new SparkFPGrowthTest();
@@ -35,10 +42,7 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 		
 //		double minSupport = 0.005;//最小支持度
 //		double minSupport = (double)(2.0/35);
-		double minSupport = 0.005;
 		System.out.println("-----------------------------------------" + minSupport);
-        int numPartition = 10;  //数据分区
-        double minConfidence = 0.5;//最小置信度
         
 		SparkSession spark = getHiveSpark("SparkFPGrowthTest",true);	//true 为本地，false为集群。正式环境的设置为集群
 		JavaSparkContext sc = new JavaSparkContext(spark.sparkContext());
@@ -77,25 +81,30 @@ public class SparkFPGrowthTest implements GasqSparkTask, Serializable {
 				return Arrays.asList(line.split(","));
 			}
 			
-		}).cache();
-		
+		}).cache();	
+	
+		List<String> result = FPGrowth4GasqV2.fpgrowth("store00000029",(double)data.count(), minSupport, items);
+		result.forEach(System.out::println);
+		return 0;
+	}
+	
+	private void fpgrowth(JavaRDD<List<String>> items) {
 		FPGrowth fpg = new FPGrowth();
 		fpg.setMinSupport(minSupport);
 		fpg.setNumPartitions(numPartition);
 		FPGrowthModel<String> model = fpg.run(items);
 		List<FreqItemset<String>> freqItems =  model.freqItemsets().toJavaRDD().filter(
-				fitemset -> (fitemset.javaItems().size() == 2)).collect();
+				fitemset -> (fitemset.javaItems().size() <= 2)).collect();
 		System.out.println("/////////////////////////////////////////////////////////");
 		freqItems.forEach( fitems -> {
 			System.out.println("[" + fitems.javaItems() + "]:" + fitems.freq());
 		});
 		System.out.println("/////////////////////////////////////////////////////////");
-		model.generateAssociationRules(minConfidence).toJavaRDD().collect().forEach( rule -> {
-			if(rule.javaAntecedent().size() == 1 && rule.javaConsequent().size() == 1) {
-				System.out.println(rule.javaAntecedent() + "-->" + rule.javaConsequent() + ":" + rule.confidence());
-			}
-		});
-		return 0;
+//		model.generateAssociationRules(minConfidence).toJavaRDD().forEach( rule -> {
+//			if(rule.javaAntecedent().size() == 1 && rule.javaConsequent().size() == 1) {
+//				System.out.println(rule.javaAntecedent() + "-->" + rule.javaConsequent() + ":" + rule.confidence());
+//			}
+//		});
 	}
 	
 	private double getMinSupportBy(int base, double defaultMinSupport) {
