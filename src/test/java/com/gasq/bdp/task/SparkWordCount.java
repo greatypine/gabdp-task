@@ -15,7 +15,7 @@ public class SparkWordCount implements GasqSparkTask {
 		SparkConf conf = new SparkConf().setAppName("SparkWiordCount").setMaster("local[*]");
 		JavaSparkContext sc = new JavaSparkContext(conf);
 		JavaRDD<String> lines = sc.textFile("E:\\Conference-Track-Management.txt");
-		JavaRDD<String> wordRdd = lines.flatMap(line -> Arrays.asList(line.split(" ")).iterator());
+		JavaRDD<String> wordRdd = lines.flatMap(line -> Arrays.asList(line.split(" ")).iterator());//文本文件所有单词的集合
 		JavaPairRDD<String, Integer> wordOneRdd = wordRdd.mapToPair(word -> new Tuple2<String, Integer>(word, 1));
 		JavaPairRDD<String, Integer> wordCountRdd = wordOneRdd.reduceByKey((x, y) -> x+y);
 		JavaPairRDD<Integer, String> countWordRdd = wordCountRdd.mapToPair(tuple -> new Tuple2(tuple._2, tuple._1));
