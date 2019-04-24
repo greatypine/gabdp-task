@@ -13,7 +13,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Encoder;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SaveMode;
@@ -42,7 +41,7 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 	 */
 	private static final long serialVersionUID = -3212332030469538560L;
 	private static final Logger logger = LoggerFactory.getLogger(ExtractUserModel.class);
-	private static final String DELIMER = "\t";
+	public static final String DELIMER = "\t";
 	
 	public static enum ACTION {
 		Request("request", "f_customer_pro_request_new_action", 0.1), 	//请求行为
@@ -109,7 +108,6 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 		
 	}
 	
-	
 
 	@Override
 	public int run(String[] args) throws Exception {
@@ -123,14 +121,20 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 			logger.warn("************end to cost::::" + Duration.between(start, end).toMillis() + "ms");
 		}
 		//--------------------------merge数据并写到hdfs中
+		logger.info("**********************begin to merge data");
 		String sql = "select customer_id, tag_level4_id, sum(score) as score from default.r_customer_pro_new_action group by customer_id, tag_level4_id";
 		Dataset<Row> dataset = spark.sql(sql);
-		dataset.map(row -> {
-			return String.join(DELIMER, row.getString(0), row.getString(1), String.valueOf(row.getDouble(2)));
-		},  Encoders.bean(String.class)).coalesce(1).write().mode(SaveMode.Overwrite).text(args[0]);
+		List<StructField> fields = new ArrayList<>();
+	    fields.add(DataTypes.createStructField("customer_id", DataTypes.StringType, true));
+	    fields.add(DataTypes.createStructField("tag_level4_id", DataTypes.StringType, true));
+	    fields.add(DataTypes.createStructField("score", DataTypes.DoubleType, true));
+	    StructType schema = DataTypes.createStructType(fields);
+		spark.createDataFrame(dataset.toJavaRDD(), schema).as(Encoders.bean(UserModelBean.class))
+				.map(UserModelBean::toString, Encoders.STRING()).coalesce(1).write().mode(SaveMode.Overwrite)
+				.text(args[0]);
 		spark.close();
 		Instant endT = Instant.now();
-		logger.warn("Done work cost=" + Duration.between(startT, endT).toMillis() + "ms");
+		logger.warn("Done work cost=" + Duration.between(startT, endT).toMillis() +  "ms");
 		return 0;
 	}
 	

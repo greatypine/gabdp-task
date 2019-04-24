@@ -37,4 +37,10 @@ public class UserModelBean implements Serializable {
 	public void setScore(double score) {
 		this.score = score;
 	}
+	@Override
+	public String toString() {
+		return String.join(ExtractUserModel.DELIMER, customer_id, tag_level4_id, String.valueOf(score));
+	}
+	
+	
 }
