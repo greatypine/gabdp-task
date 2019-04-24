@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,7 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 	private SparkSession spark;
 	private int taskNum = 3;	//循环执行三次
 	private Map<String, Double> alphMap;
+	private boolean ignoreClean = false;
 	
 	public ExtractUserModel() {
 		if(spark == null) {
@@ -88,16 +90,23 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 		}
 		ExtractUserModel model = new ExtractUserModel();
 		try {
-			if(args != null && args.length == 2) {
-				String alph = args[1];
-				String[] alphs = alph.split(",");
-				for(int i = 0; i < alphs.length; i++) {
-					if(alphs[i] != null && alphs[i].contains("=")) {
-						String[] str = alphs[i].split("=");
-						if(str != null && str.length == 2 && StringUtils.isNumeric(str[1]))
-							model.alphMap.put(str[0], Double.parseDouble(str[1]));
+			if(args != null) {
+				if(args.length > 1) {
+					List<String> argsList = Arrays.asList(args);
+					argsList.remove(0);
+					String alph = args[1];
+					String[] alphs = alph.split(",");
+					for(int i = 0; i < alphs.length; i++) {
+						if(alphs[i] != null && alphs[i].contains("=")) {
+							String[] str = alphs[i].split("=");
+							if(str != null && str.length == 2 && StringUtils.isNumeric(str[1]))
+								model.alphMap.put(str[0], Double.parseDouble(str[1]));
+						}
 					}
-					
+					if(argsList.contains("ignoreClean")) {
+						model.ignoreClean = true;
+						logger.warn("args include <ignoreClean> parameter. We are going to ignore cleanData method. NOTE!!! Using for debug");
+					}
 				}
 			}
 			model.run(args);
@@ -112,13 +121,15 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 	@Override
 	public int run(String[] args) throws Exception {
 		Instant startT = Instant.now();
-		ACTION[] actions = ACTION.values();
-		for(int i = 0; i < actions.length; i++) {
-			Instant start = Instant.now();
-			logger.warn("************begin to deal with::::" + actions[i].getAction());
-			cleanData(actions[i].getTable(), (i==0));
-			Instant end = Instant.now();
-			logger.warn("************end to cost::::" + Duration.between(start, end).toMillis() + "ms");
+		if(!ignoreClean) {	//忽略数据的计算
+			ACTION[] actions = ACTION.values();
+			for(int i = 0; i < actions.length; i++) {
+				Instant start = Instant.now();
+				logger.warn("************begin to deal with::::" + actions[i].getAction());
+				cleanData(actions[i].getTable(), (i==0));
+				Instant end = Instant.now();
+				logger.warn("************end to cost::::" + Duration.between(start, end).toMillis() + "ms");
+			}
 		}
 		//--------------------------merge数据并写到hdfs中
 		logger.info("**********************begin to merge data");
@@ -160,7 +171,7 @@ public class ExtractUserModel implements GasqSparkTask, Serializable {
 	    fields.add(DataTypes.createStructField("score", DataTypes.LongType, true));
 	    StructType schema = DataTypes.createStructType(fields);
 		Dataset<UserCommodityActionBean> beanSet = spark.createDataFrame(rows.toJavaRDD(), schema)
-                .as(Encoders.bean(UserCommodityActionBean.class)).repartition(10).persist(StorageLevel.MEMORY_AND_DISK());
+                .as(Encoders.bean(UserCommodityActionBean.class)).persist(StorageLevel.MEMORY_AND_DISK());
 		int i = 0;
 		while(i < taskNum) {
 			beanSet = normalizeData(beanSet);
